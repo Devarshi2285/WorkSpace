@@ -32,6 +32,7 @@ const io = require('socket.io')(server, {
 });
 
 io.on('connection', (socket) => {
+    
     socket.on('join-room', (roomId,id) => {
         console.log(`User joined room: ${roomId}`);
         socket.join(roomId);

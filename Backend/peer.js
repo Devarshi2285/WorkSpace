@@ -13,6 +13,7 @@ const corsOptions = {
 
 // Set up PeerJS server with CORS
 const server = app.listen(PORT, () => {
+    
     console.log(`PeerJS Server is running on port ${PORT}`);
 });
 const peerServer = ExpressPeerServer(server, {

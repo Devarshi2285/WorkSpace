@@ -83,7 +83,7 @@ const App = () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: false
+        audio: true
       });
       
       screenStream.current = stream;
@@ -208,7 +208,7 @@ const App = () => {
           port: '',
           secure: true,
         });
-        
+
         peerRef.current.on('error', (err) => {
           if (mounted) setPeerError(err.message);
         });
