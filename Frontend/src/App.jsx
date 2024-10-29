@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
-import { Camera, CameraOff, Mic, MicOff, Users, Monitor, MonitorOff } from 'lucide-react';
+import { Camera, CameraOff, Mic, MicOff, Users } from 'lucide-react';
 import { Peer } from "https://esm.sh/peerjs@1.5.4?bundle-deps";
 
 const App = () => {
@@ -10,16 +10,12 @@ const App = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [screenStreams, setScreenStreams] = useState({});
   
   const videoRef = useRef(null);
   const socket = useRef(null);
   const peerRef = useRef(null);
   const myStream = useRef(null);
-  const screenStream = useRef(null);
   const connections = useRef(new Set());
-  const screenConnections = useRef(new Map());
 
   const addVideoStream = (stream, userId) => {
     if (!connections.current.has(userId)) {
@@ -47,17 +43,17 @@ const App = () => {
     }
   };
 
-  // const removeUserStream = (userId) => {
-  //   if (connections.current.has(userId)) {
-  //     connections.current.delete(userId);
-  //     setRemoteStreams(prev => {
-  //       const newStreams = { ...prev };
-  //       delete newStreams[userId];
-  //       return newStreams;
-  //     });
-  //     setParticipantCount(prev => Math.max(1, prev - 1));
-  //   }
-  // };
+  const removeUserStream = (userId) => {
+    if (connections.current.has(userId)) {
+      connections.current.delete(userId);
+      setRemoteStreams(prev => {
+        const newStreams = { ...prev };
+        delete newStreams[userId];
+        return newStreams;
+      });
+      setParticipantCount(prev => Math.max(1, prev - 1));
+    }
+  };
 
   const toggleMute = () => {
     if (myStream.current) {
@@ -79,95 +75,13 @@ const App = () => {
     }
   };
 
-  const startScreenShare = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true
-      });
-      
-      screenStream.current = stream;
-
-      // Send screen share to all connected peers
-      connections.current.forEach(userId => {
-        if (peerRef.current) {
-          const call = peerRef.current.call(userId, stream, {
-            metadata: { type: 'screen-share' }
-          });
-          
-          screenConnections.current.set(userId, call);
-        }
-      });
-
-      // Handle stream end (user stops sharing)
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenShare();
-      };
-
-      // Add screen share to local display
-      setScreenStreams(prev => ({
-        ...prev,
-        local: stream
-      }));
-      
-      setIsScreenSharing(true);
-    } catch (error) {
-      console.error('Error sharing screen:', error);
-    }
-  };
-
-  const stopScreenShare = () => {
-    if (screenStream.current) {
-      // Stop all tracks
-      screenStream.current.getTracks().forEach(track => track.stop());
-      
-      // Remove screen share from local display
-      setScreenStreams(prev => {
-        const newStreams = { ...prev };
-        delete newStreams.local;
-        return newStreams;
-      });
-
-      // Close all screen share peer connections
-      screenConnections.current.forEach(call => {
-        call.close();
-      });
-      screenConnections.current.clear();
-      
-      screenStream.current = null;
-      setIsScreenSharing(false);
-    }
-  };
-
-  const removeUserStream = (userId) => {
-    if (connections.current.has(userId)) {
-      connections.current.delete(userId);
-      setRemoteStreams(prev => {
-        const newStreams = { ...prev };
-        delete newStreams[userId];
-        return newStreams;
-      });
-      // Also remove any screen shares from this user
-      setScreenStreams(prev => {
-        const newStreams = { ...prev };
-        delete newStreams[userId];
-        return newStreams;
-      });
-      setParticipantCount(prev => Math.max(1, prev - 1));
-    }
-  };
-
   useEffect(() => {
     let mounted = true;
 
     const cleanup = () => {
       connections.current.clear();
-      screenConnections.current.clear();
       if (myStream.current) {
         myStream.current.getTracks().forEach(track => track.stop());
-      }
-      if (screenStream.current) {
-        screenStream.current.getTracks().forEach(track => track.stop());
       }
       if (socket.current) {
         socket.current.disconnect();
@@ -219,35 +133,14 @@ const App = () => {
         });
 
         peerRef.current.on('call', (call) => {
-          // Check if this is a screen share call
-          if (call.metadata?.type === 'screen-share') {
-            call.answer(null); // Don't send any stream back for screen shares
-            call.on('stream', (userScreenStream) => {
-              if (mounted) {
-                setScreenStreams(prev => ({
-                  ...prev,
-                  [call.peer]: userScreenStream
-                }));
-              }
-            });
-          } else {
-            // Handle regular video calls as before
-            call.answer(stream);
-            call.on('stream', (userVideoStream) => {
-              if (mounted) addVideoStream(userVideoStream, call.peer);
-            });
-          }
+          call.answer(stream);
+          call.on('stream', (userVideoStream) => {
+            if (mounted) addVideoStream(userVideoStream, call.peer);
+          });
         });
 
         socket.current.on('user-connected', (userId) => {
           if (mounted) connectToNewUser(userId, stream);
-          // If we're currently screen sharing, share with new user
-          if (screenStream.current) {
-            const call = peerRef.current.call(userId, screenStream.current, {
-              metadata: { type: 'screen-share' }
-            });
-            screenConnections.current.set(userId, call);
-          }
         });
 
         socket.current.on('user-disconnected', (userId) => {
@@ -326,24 +219,6 @@ const App = () => {
             </div>
           </div>
         ))}
-
-        {/* Screen shares */}
-        {Object.entries(screenStreams).map(([userId, stream]) => (
-          <div key={`screen-${userId}`} className="relative aspect-video bg-gray-800 rounded-xl overflow-hidden ring-1 ring-gray-700">
-            <video
-              autoPlay
-              ref={video => {
-                if (video) video.srcObject = stream;
-              }}
-              className="w-full h-full object-contain"
-            />
-            <div className="absolute inset-x-0 bottom-0 px-4 py-2 bg-gradient-to-t from-black/70 to-transparent">
-              <span className="text-sm font-medium">
-                Screen Share - {userId === 'local' ? 'You' : `User ${userId.slice(0, 8)}`}
-              </span>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Controls */}
@@ -367,16 +242,6 @@ const App = () => {
           }`}
         >
           {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
-        </button>
-        <button 
-          onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-          className={`p-3 rounded-full transition-all ${
-            isScreenSharing 
-              ? 'bg-blue-500/20 text-blue-500 hover:bg-blue-500/30' 
-              : 'hover:bg-gray-700 text-gray-300'
-          }`}
-        >
-          {isScreenSharing ? <MonitorOff size={24} /> : <Monitor size={24} />}
         </button>
       </div>
     </div>
