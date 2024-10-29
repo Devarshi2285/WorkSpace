@@ -6,14 +6,13 @@ const PORT = 3002;
 
 // CORS configuration for PeerJS
 const corsOptions = {
-    origin: 'work-space-zeta-rose.vercel.app', // Specify your client URL here
+    origin: 'https://work-space-zeta-rose.vercel.app', // Specify your client URL here
     methods: ["GET", "POST"],
     credentials: true,
 };
 
 // Set up PeerJS server with CORS
 const server = app.listen(PORT, () => {
-    
     console.log(`PeerJS Server is running on port ${PORT}`);
 });
 const peerServer = ExpressPeerServer(server, {
