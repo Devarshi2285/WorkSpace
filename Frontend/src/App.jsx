@@ -23,6 +23,64 @@ const App = () => {
 
   // ... keep your existing addVideoStream, removeUserStream, toggleMute, toggleCamera functions ...
 
+  const addVideoStream = (stream, userId) => {
+    if (!connections.current.has(userId)) {
+      connections.current.add(userId);
+      setRemoteStreams(prev => ({
+        ...prev,
+        [userId]: stream
+      }));
+      setParticipantCount(prev => prev + 1);
+    }
+  };
+
+  const connectToNewUser = (userId, stream) => {
+    if (!connections.current.has(userId) && peerRef.current) {
+      console.log('Connecting to user:', userId);
+      const call = peerRef.current.call(userId, stream);
+      
+      call.on('stream', (userVideoStream) => {
+        addVideoStream(userVideoStream, userId);
+      });
+
+      call.on('close', () => {
+        removeUserStream(userId);
+      });
+    }
+  };
+
+//   const removeUserStream = (userId) => {
+//     if (connections.current.has(userId)) {
+//       connections.current.delete(userId);
+//       setRemoteStreams(prev => {
+//         const newStreams = { ...prev };
+//         delete newStreams[userId];
+//         return newStreams;
+//       });
+//       setParticipantCount(prev => Math.max(1, prev - 1));
+//     }
+//   };
+
+  const toggleMute = () => {
+    if (myStream.current) {
+      const audioTrack = myStream.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleCamera = () => {
+    if (myStream.current) {
+      const videoTrack = myStream.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsCameraOff(!videoTrack.enabled);
+      }
+    }
+  };
+
   const startScreenShare = async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
