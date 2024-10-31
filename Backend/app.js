@@ -7,7 +7,7 @@ const server = http.createServer(app);
 
 // CORS configuration
 const corsOptions = {
-    origin: 'work-space-zeta-rose.vercel.app', // Specify your client URL here
+    origin: 'https://work-space-zeta-rose.vercel.app', // Specify your client URL here
     methods: ["GET", "POST"],
     credentials: true,
 };
@@ -25,7 +25,7 @@ const usersInRoom = {};
 // Set up Socket.IO
 const io = require('socket.io')(server, {
     cors: {
-        origin: "work-space-zeta-rose.vercel.app", // Specify your client URL here
+        origin: "https://work-space-zeta-rose.vercel.app", // Specify your client URL here
         methods: ["GET", "POST"],
         credentials: true,
     }
